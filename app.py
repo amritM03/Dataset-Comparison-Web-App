@@ -1,30 +1,31 @@
-import os
-import pandas as pd
 from flask import Flask, render_template, request, jsonify, send_file
+import pandas as pd
+import os
 from werkzeug.utils import secure_filename
+import uuid
 
 app = Flask(__name__)
-app.config["UPLOAD_FOLDER"] = "uploads"
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+UPLOAD_FOLDER = "uploads"
+RESULTS_FOLDER = "results"
 
-ALLOWED_EXTENSIONS = {"csv", "xlsx", "xls", "tsv"}
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
-def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def clear_folder(folder):
+    """Remove old files before saving new ones"""
+    for f in os.listdir(folder):
+        os.remove(os.path.join(folder, f))
+
 
 def read_file(file_path):
-    ext = file_path.rsplit(".", 1)[1].lower()
     try:
-        if ext in ["xlsx", "xls"]:
-            return pd.read_excel(file_path, engine="openpyxl")
-        elif ext == "csv":
+        if file_path.endswith(".csv"):
             return pd.read_csv(file_path)
-        elif ext == "tsv":
-            return pd.read_csv(file_path, sep="\t")
-        else:
-            return None
+        elif file_path.endswith((".xls", ".xlsx")):
+            return pd.read_excel(file_path, engine="openpyxl")
     except Exception as e:
-        print(f"Error reading file {file_path}: {e}")
+        print(f"Error reading {file_path}: {e}")
         return None
 
 
@@ -33,49 +34,54 @@ def index():
     return render_template("index.html")
 
 
+# 🔹 Get headers from uploaded files
 @app.route("/get_headers", methods=["POST"])
 def get_headers():
-    file1 = request.files.get("file1")
-    file2 = request.files.get("file2")
+    try:
+        clear_folder(UPLOAD_FOLDER)
 
-    headers = {"file1_headers": [], "file2_headers": []}
+        file1 = request.files.get("file1")
+        file2 = request.files.get("file2")
 
-    if file1 and allowed_file(file1.filename):
-        file1_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file1.filename))
-        file1.save(file1_path)
-        df1 = read_file(file1_path)
-        if df1 is not None:
-            headers["file1_headers"] = list(df1.columns)
+        headers_file1, headers_file2 = [], []
 
-    if file2 and allowed_file(file2.filename):
-        file2_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file2.filename))
-        file2.save(file2_path)
-        df2 = read_file(file2_path)
-        if df2 is not None:
-            headers["file2_headers"] = list(df2.columns)
+        if file1:
+            filepath1 = os.path.join(UPLOAD_FOLDER, secure_filename(file1.filename))
+            file1.save(filepath1)
+            df1 = read_file(filepath1)
+            if df1 is not None:
+                headers_file1 = df1.columns.tolist()
 
-    return jsonify(headers)
+        if file2:
+            filepath2 = os.path.join(UPLOAD_FOLDER, secure_filename(file2.filename))
+            file2.save(filepath2)
+            df2 = read_file(filepath2)
+            if df2 is not None:
+                headers_file2 = df2.columns.tolist()
+
+        return jsonify({
+            "file1_headers": headers_file1,
+            "file2_headers": headers_file2
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
+# 🔹 Compare and create Excel with 4 sheets
 @app.route("/compare", methods=["POST"])
 def compare():
     try:
-        file1 = request.files.get("file1")
-        file2 = request.files.get("file2")
+        file1_name = request.form.get("file1_name")
+        file2_name = request.form.get("file2_name")
 
         unique_col1 = request.form.get("unique_column_file1")
         unique_col2 = request.form.get("unique_column_file2")
         compare_col1 = request.form.get("compare_column_file1")
         compare_col2 = request.form.get("compare_column_file2")
 
-        if not all([file1, file2, unique_col1, unique_col2, compare_col1, compare_col2]):
-            return jsonify({"error": "All fields are required"}), 400
-
-        # Save files
-        file1_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file1.filename))
-        file2_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file2.filename))
-        file1.save(file1_path)
-        file2.save(file2_path)
+        file1_path = os.path.join(UPLOAD_FOLDER, file1_name)
+        file2_path = os.path.join(UPLOAD_FOLDER, file2_name)
 
         df1 = read_file(file1_path)
         df2 = read_file(file2_path)
@@ -83,31 +89,38 @@ def compare():
         if df1 is None or df2 is None:
             return jsonify({"error": "Could not read one of the files"}), 400
 
-        # Merge data on unique keys
         merged = pd.merge(
             df1[[unique_col1, compare_col1]],
             df2[[unique_col2, compare_col2]],
             left_on=unique_col1,
             right_on=unique_col2,
             how="outer",
-            suffixes=("_file1", "_file2")
+            indicator=True
         )
 
-        # Categorize results
-        matched = merged[(merged[compare_col1] == merged[compare_col2]) & merged[compare_col1].notna()]
-        partially_matched = merged[(merged[compare_col1] != merged[compare_col2]) & merged[unique_col1].notna() & merged[unique_col2].notna()]
-        sheet1_unmatched = merged[merged[unique_col2].isna()]  # in File1, not in File2
-        sheet2_unmatched = merged[merged[unique_col1].isna()]  # in File2, not in File1
+        # Sheets
+        matched = merged[
+            (merged["_merge"] == "both") &
+            (merged[compare_col1] == merged[compare_col2])
+        ]
 
-        # Save to Excel with 4 sheets
-        output_path = os.path.join(app.config["UPLOAD_FOLDER"], "comparison_result.xlsx")
-        with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        partially_matched = merged[
+            (merged["_merge"] == "both") &
+            (merged[compare_col1] != merged[compare_col2])
+        ]
+
+        sheet1_unmatched = merged[merged["_merge"] == "left_only"]
+        sheet2_unmatched = merged[merged["_merge"] == "right_only"]
+
+        # Save results in single Excel file
+        result_file = os.path.join(RESULTS_FOLDER, f"comparison_result_{uuid.uuid4().hex}.xlsx")
+        with pd.ExcelWriter(result_file, engine="openpyxl") as writer:
             matched.to_excel(writer, sheet_name="Matched", index=False)
             partially_matched.to_excel(writer, sheet_name="Partially_Matched", index=False)
             sheet1_unmatched.to_excel(writer, sheet_name="Sheet_1_UnMatched", index=False)
             sheet2_unmatched.to_excel(writer, sheet_name="Sheet_2_UnMatched", index=False)
 
-        return send_file(output_path, as_attachment=True)
+        return send_file(result_file, as_attachment=True)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -115,6 +128,8 @@ def compare():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+
 
 
 
