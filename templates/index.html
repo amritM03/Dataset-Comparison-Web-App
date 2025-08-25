@@ -3,83 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>File Comparator</title>
+    <title>Dataset Comparison Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        body {
-            background: linear-gradient(135deg, #1e3c72, #2a5298);
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: #333;
-        }
-        .card {
-            border-radius: 15px;
-            padding: 30px;
-            width: 800px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-        }
-        h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #1e3c72;
-        }
-        .spinner-border {
-            display: none;
-            margin-top: 15px;
-        }
+        body { background: #f8f9fa; }
+        .container { margin-top: 50px; max-width: 900px; }
+        .card { padding: 30px; border-radius: 15px; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); }
+        .spinner-border { display: none; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>File Comparator</h2>
-        <form id="fileForm">
-            <div class="row mb-3">
-                <div class="col">
-                    <label>File 1:</label>
-                    <input type="file" name="file1" id="file1" class="form-control" required>
-                </div>
-                <div class="col">
-                    <label>File 2:</label>
-                    <input type="file" name="file2" id="file2" class="form-control" required>
-                </div>
-            </div>
+    <div class="container">
+        <div class="card">
+            <h3 class="text-center mb-4">📊 Dataset Comparison Tool</h3>
 
-            <div class="row mb-3">
-                <div class="col">
-                    <label>Unique Column for File 1:</label>
-                    <select id="unique_column_file1" name="unique_column_file1" class="form-control"></select>
+            <form id="compareForm" enctype="multipart/form-data">
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Upload File 1</label>
+                        <input type="file" id="file1" name="file1" class="form-control" required>
+                    </div>
+                    <div class="col">
+                        <label>Upload File 2</label>
+                        <input type="file" id="file2" name="file2" class="form-control" required>
+                    </div>
                 </div>
-                <div class="col">
-                    <label>Unique Column for File 2:</label>
-                    <select id="unique_column_file2" name="unique_column_file2" class="form-control"></select>
-                </div>
-            </div>
 
-            <div class="row mb-3">
-                <div class="col">
-                    <label>Column to Compare for File 1:</label>
-                    <select id="compare_column_file1" name="compare_column_file1" class="form-control"></select>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Unique Column (File 1)</label>
+                        <select id="unique_column_file1" name="unique_column_file1" class="form-select" required></select>
+                    </div>
+                    <div class="col">
+                        <label>Unique Column (File 2)</label>
+                        <select id="unique_column_file2" name="unique_column_file2" class="form-select" required></select>
+                    </div>
                 </div>
-                <div class="col">
-                    <label>Column to Compare for File 2:</label>
-                    <select id="compare_column_file2" name="compare_column_file2" class="form-control"></select>
-                </div>
-            </div>
 
-            <button type="submit" class="btn btn-primary w-100">Compare Files</button>
-            <div class="spinner-border text-primary" role="status" id="loadingSpinner">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </form>
+                <div class="row mb-3">
+                    <div class="col">
+                        <label>Compare Column (File 1)</label>
+                        <select id="compare_column_file1" name="compare_column_file1" class="form-select" required></select>
+                    </div>
+                    <div class="col">
+                        <label>Compare Column (File 2)</label>
+                        <select id="compare_column_file2" name="compare_column_file2" class="form-select" required></select>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary">Compare Files</button>
+                    <div class="spinner-border text-primary ms-3" role="status" id="loadingSpinner">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
-        // Fetch headers when files selected
-        $("#file1, #file2").on("change", function(){
-            let formData = new FormData($("#fileForm")[0]);
+        function fetchHeaders(){
+            let formData = new FormData();
+            if ($("#file1")[0].files.length > 0) {
+                formData.append("file1", $("#file1")[0].files[0]);
+            }
+            if ($("#file2")[0].files.length > 0) {
+                formData.append("file2", $("#file2")[0].files[0]);
+            }
+
             $.ajax({
                 url: "/get_headers",
                 type: "POST",
@@ -93,46 +85,42 @@
                     data.file1_headers.forEach(col => {
                         $("#unique_column_file1, #compare_column_file1").append(new Option(col, col));
                     });
-
                     data.file2_headers.forEach(col => {
                         $("#unique_column_file2, #compare_column_file2").append(new Option(col, col));
                     });
                 }
             });
-        });
+        }
 
-        // Compare form submit
-        $("#fileForm").on("submit", function(e){
+        $("#file1, #file2").on("change", fetchHeaders);
+
+        $("#compareForm").on("submit", function(e){
             e.preventDefault();
             $("#loadingSpinner").show();
-
-            let formData = new FormData(this);
-            formData.append("file1_name", $("#file1")[0].files[0].name);
-            formData.append("file2_name", $("#file2")[0].files[0].name);
 
             $.ajax({
                 url: "/compare",
                 type: "POST",
-                data: formData,
+                data: new FormData(this),
                 processData: false,
                 contentType: false,
                 xhrFields: { responseType: 'blob' },
-                success: function(blob){
+                success: function(data){
                     $("#loadingSpinner").hide();
-                    let url = window.URL.createObjectURL(blob);
+                    let url = window.URL.createObjectURL(data);
                     let a = document.createElement("a");
                     a.href = url;
                     a.download = "comparison_result.xlsx";
-                    document.body.appendChild(a);
                     a.click();
-                    a.remove();
                 },
                 error: function(){
                     $("#loadingSpinner").hide();
-                    alert("Error comparing files.");
+                    alert("Error during comparison. Please try again.");
                 }
             });
         });
     </script>
 </body>
 </html>
+
+
