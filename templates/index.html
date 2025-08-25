@@ -1,234 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>File Comparator</title>
-  <style>
-    body {
-      font-family: "Inter", "Roboto", sans-serif;
-      margin: 0;
-      padding: 0;
-      background: linear-gradient(135deg, #1b3fab, #5d8dee);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-
-    .container {
-      width: 85%;
-      max-width: 800px;
-      background: #fff;
-      padding: 40px;
-      border-radius: 16px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-      animation: fadeIn 0.5s ease-in-out;
-    }
-
-    h1 {
-      font-size: 32px;
-      font-weight: 700;
-      text-align: center;
-      margin-bottom: 30px;
-      color: #1b3fab;
-    }
-
-    form {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    label {
-      font-size: 15px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 6px;
-      display: block;
-    }
-
-    input[type="file"],
-    select {
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      width: 100%;
-      font-size: 14px;
-      transition: border 0.2s ease;
-    }
-
-    input[type="file"]:focus,
-    select:focus {
-      border-color: #1b3fab;
-      outline: none;
-    }
-
-    .submit-container {
-      grid-column: span 2;
-      text-align: center;
-      margin-top: 20px;
-    }
-
-    input[type="submit"] {
-      background-color: #1b3fab;
-      color: #fff;
-      padding: 12px 24px;
-      font-size: 16px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-    }
-
-    input[type="submit"]:hover {
-      background-color: #16327e;
-    }
-
-    .download-links {
-      margin-top: 30px;
-      text-align: center;
-    }
-
-    .download-links a {
-      display: inline-block;
-      padding: 12px 24px;
-      background-color: #28a745;
-      color: #fff;
-      text-decoration: none;
-      border-radius: 8px;
-      font-size: 15px;
-      transition: background-color 0.3s ease;
-    }
-
-    .download-links a:hover {
-      background-color: #218838;
-    }
-
-    @keyframes fadeIn {
-      from {opacity: 0; transform: translateY(20px);}
-      to {opacity: 1; transform: translateY(0);}
-    }
-  </style>
-
-  <script>
-    async function uploadFiles() {
-      const file1 = document.getElementById('file1').files[0];
-      const file2 = document.getElementById('file2').files[0];
-
-      if (file1 && file2) {
-        const formData = new FormData();
-        formData.append('file1', file1);
-        formData.append('file2', file2);
-
-        try {
-          const response = await fetch('/get_headers', {
-            method: 'POST',
-            body: formData
-          });
-
-          if (!response.ok) {
-            throw new Error('Error fetching headers');
-          }
-
-          const headers = await response.json();
-
-          if (headers.error) {
-            alert(headers.error);
-            return;
-          }
-
-          populateDropdowns(headers);
-
-        } catch (error) {
-          console.error('Error:', error);
+    <meta charset="UTF-8">
+    <title>Dataset Comparison Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
         }
-      }
-    }
-
-    function populateDropdowns(headers) {
-      const uniqueColumnSelect1 = document.getElementById('unique_column1');
-      const uniqueColumnSelect2 = document.getElementById('unique_column2');
-      const columnsToCompareSelect1 = document.getElementById('columns_to_compare1');
-      const columnsToCompareSelect2 = document.getElementById('columns_to_compare2');
-
-      // Reset with placeholders
-      uniqueColumnSelect1.innerHTML = '<option disabled selected>Select column</option>';
-      uniqueColumnSelect2.innerHTML = '<option disabled selected>Select column</option>';
-      columnsToCompareSelect1.innerHTML = '<option disabled selected>Select column</option>';
-      columnsToCompareSelect2.innerHTML = '<option disabled selected>Select column</option>';
-
-      if (!headers['file1'].length || !headers['file2'].length) {
-        alert("One or both files have no headers.");
-        return;
-      }
-
-      headers['file1'].forEach(header => {
-        const option1 = document.createElement('option');
-        option1.value = header;
-        option1.textContent = header;
-        uniqueColumnSelect1.appendChild(option1);
-
-        const option2 = document.createElement('option');
-        option2.value = header;
-        option2.textContent = header;
-        columnsToCompareSelect1.appendChild(option2);
-      });
-
-      headers['file2'].forEach(header => {
-        const option1 = document.createElement('option');
-        option1.value = header;
-        option1.textContent = header;
-        uniqueColumnSelect2.appendChild(option1);
-
-        const option2 = document.createElement('option');
-        option2.value = header;
-        option2.textContent = header;
-        columnsToCompareSelect2.appendChild(option2);
-      });
-    }
-  </script>
+        .container {
+            margin-top: 40px;
+            padding: 25px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0px 0px 12px rgba(0,0,0,0.1);
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .loading span {
+            font-size: 1.2rem;
+            color: #007bff;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>File Comparator</h1>
-    <form method="post" enctype="multipart/form-data" action="/">
-      <div>
-        <label for="file1">File 1:</label>
-        <input type="file" id="file1" name="file1" accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="uploadFiles()" required>
-      </div>
-      <div>
-        <label for="file2">File 2:</label>
-        <input type="file" id="file2" name="file2" accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="uploadFiles()" required>
-      </div>
-      <div>
-        <label for="unique_column1">Unique Column for File 1:</label>
-        <select id="unique_column1" name="unique_column1"></select>
-      </div>
-      <div>
-        <label for="unique_column2">Unique Column for File 2:</label>
-        <select id="unique_column2" name="unique_column2"></select>
-      </div>
-      <div>
-        <label for="columns_to_compare1">Column to Compare for File 1:</label>
-        <select id="columns_to_compare1" name="columns_to_compare1"></select>
-      </div>
-      <div>
-        <label for="columns_to_compare2">Column to Compare for File 2:</label>
-        <select id="columns_to_compare2" name="columns_to_compare2"></select>
-      </div>
-      <div class="submit-container">
-        <input type="submit" value="Compare Files">
-      </div>
+<div class="container">
+    <h2 class="text-center mb-4">📊 Dataset Comparison Tool</h2>
+
+    <form id="uploadForm" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label class="form-label">Upload File 1</label>
+            <input class="form-control" type="file" name="file1" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Upload File 2</label>
+            <input class="form-control" type="file" name="file2" required>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Unique Column (File 1)</label>
+                <select class="form-select" name="unique_column_file1" required></select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Unique Column (File 2)</label>
+                <select class="form-select" name="unique_column_file2" required></select>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Compare Column (File 1)</label>
+                <select class="form-select" name="compare_column_file1" required></select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Compare Column (File 2)</label>
+                <select class="form-select" name="compare_column_file2" required></select>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">Compare Files</button>
     </form>
 
-    {% if sheets_available %}
-    <div class="download-links">
-      <a href="/download">Download Comparison Result</a>
+    <div class="loading" id="loading">
+        <div class="spinner-border text-primary" role="status"></div>
+        <span> Processing... Please wait </span>
     </div>
-    {% endif %}
-  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+$(document).ready(function(){
+
+    // When files are uploaded → fetch headers
+    $("input[name='file1'], input[name='file2']").on("change", function(){
+        var formData = new FormData($("#uploadForm")[0]);
+        $.ajax({
+            url: "/get_headers",
+            type: "POST",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(data){
+                let file1_headers = data.file1_headers;
+                let file2_headers = data.file2_headers;
+
+                $("select[name='unique_column_file1'], select[name='compare_column_file1']").empty();
+                $("select[name='unique_column_file2'], select[name='compare_column_file2']").empty();
+
+                file1_headers.forEach(col => {
+                    $("select[name='unique_column_file1'], select[name='compare_column_file1']")
+                        .append(new Option(col, col));
+                });
+
+                file2_headers.forEach(col => {
+                    $("select[name='unique_column_file2'], select[name='compare_column_file2']")
+                        .append(new Option(col, col));
+                });
+            }
+        });
+    });
+
+    // On form submit → trigger download
+    $("#uploadForm").on("submit", function(e){
+        e.preventDefault();
+        $("#loading").show();
+
+        var formData = new FormData(this);
+
+        fetch("/compare", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) throw new Error("Error generating file");
+            return response.blob();
+        })
+        .then(blob => {
+            $("#loading").hide();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "comparison_result.xlsx";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        })
+        .catch(err => {
+            $("#loading").hide();
+            alert("Error: " + err.message);
+        });
+    });
+});
+</script>
 </body>
 </html>
-
-
