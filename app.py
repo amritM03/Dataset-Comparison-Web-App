@@ -1,180 +1,120 @@
+import os
 import pandas as pd
-from flask import Flask, render_template, request, send_file, jsonify
-import io
-import concurrent.futures
+from flask import Flask, render_template, request, jsonify, send_file
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-combined_df = {}
-sheet_names = []
+app.config["UPLOAD_FOLDER"] = "uploads"
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-def read_file(file):
-    filename = file.filename
-    if filename.endswith('.xlsx') or filename.endswith('.xls'):
-        return pd.read_excel(file, dtype=str)
-    elif filename.endswith('.csv'):
-        return pd.read_csv(file, dtype=str)
-    elif filename.endswith('.tsv') or filename.endswith('.txt'):
-        return pd.read_csv(file, sep='\t', dtype=str)
-    else:
-        raise ValueError("Unsupported file format")
+ALLOWED_EXTENSIONS = {"csv", "xlsx", "xls", "tsv"}
 
-def process_files(file1, file2, unique_column1, unique_column2, column_to_compare1, column_to_compare2):
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def read_file(file_path):
+    ext = file_path.rsplit(".", 1)[1].lower()
     try:
-        df1 = read_file(file1)
-        df2 = read_file(file2)
-
-        df1[unique_column1] = df1[unique_column1].str.strip().str.lstrip('0')
-        df2[unique_column2] = df2[unique_column2].str.strip().str.lstrip('0')
-
-        df1.set_index(unique_column1, inplace=True)
-        df2.set_index(unique_column2, inplace=True)
-
-        if column_to_compare1 not in df1.columns or column_to_compare2 not in df2.columns:
-            return "Error: No common columns found for comparison.", None
-
-        # Convert both columns to float for comparison
-        df1[column_to_compare1] = df1[column_to_compare1].astype(float)
-        df2[column_to_compare2] = df2[column_to_compare2].astype(float)
-
-        common_index = df1.index.intersection(df2.index)
-        unique_index_df1 = df1.index.difference(df2.index)
-        unique_index_df2 = df2.index.difference(df1.index)
-
-        differing_rows = df1.loc[common_index, column_to_compare1] != df2.loc[common_index, column_to_compare2]
-
-        differing_df = df1.loc[common_index][differing_rows]
-        identical_df = df1.loc[common_index][~differing_rows]
-        unmatched_df1 = df1.loc[unique_index_df1]
-        unmatched_df2 = df2.loc[unique_index_df2]
-
-        differing_ = pd.DataFrame(differing_df)
-        identical_ = pd.DataFrame(identical_df)
-        totallyunmatched_1 = pd.DataFrame(unmatched_df1)
-        totallyunmatched_2 = pd.DataFrame(unmatched_df2)
-
-        if not differing_.empty:
-            differing_[unique_column1] = differing_.index
-        if not identical_.empty:
-            identical_[unique_column1] = identical_.index
-        if not totallyunmatched_1.empty:
-            totallyunmatched_1[unique_column1] = totallyunmatched_1.index
-        if not totallyunmatched_2.empty:
-            totallyunmatched_2[unique_column2] = totallyunmatched_2.index
-
-        def move_columns_to_end(df, unique_col, compare_col):
-            cols = df.columns.tolist()
-            if unique_col in cols:
-                cols.remove(unique_col)
-            if compare_col in cols:
-                cols.remove(compare_col)
-            cols.append(unique_col)
-            if compare_col in df.columns:
-                cols.append(compare_col)
-            return df[cols]
-
-        if not differing_.empty:
-            differing_ = move_columns_to_end(differing_, unique_column1, column_to_compare1)
-        if not identical_.empty:
-            identical_ = move_columns_to_end(identical_, unique_column1, column_to_compare1)
-        if not totallyunmatched_1.empty:
-            totallyunmatched_1 = move_columns_to_end(totallyunmatched_1, unique_column1, column_to_compare1)
-        if not totallyunmatched_2.empty:
-            totallyunmatched_2 = move_columns_to_end(totallyunmatched_2, unique_column2, column_to_compare2)
-
-        combined_df = {
-            'Matched': identical_,
-            'Partially_Matched': differing_,
-            'S1_UnMatched': totallyunmatched_1,
-            'S2_UnMatched': totallyunmatched_2
-        }
-        sheet_names = ['Matched', 'Partially_Matched', 'S1_UnMatched', 'S2_UnMatched']
-
-        return None, (combined_df, sheet_names)
-
+        if ext in ["xlsx", "xls"]:
+            return pd.read_excel(file_path, engine="openpyxl")
+        elif ext == "csv":
+            return pd.read_csv(file_path)
+        elif ext == "tsv":
+            return pd.read_csv(file_path, sep="\t")
+        else:
+            return None
     except Exception as e:
-        return str(e), None
+        print(f"Error reading file {file_path}: {e}")
+        return None
 
-@app.route('/', methods=['GET', 'POST'])
+
+@app.route("/")
 def index():
-    global combined_df, sheet_names
+    return render_template("index.html")
 
-    if request.method == 'POST':
-        try:
-            file1 = request.files['file1']
-            file2 = request.files['file2']
-            unique_column1 = request.form['unique_column1']
-            unique_column2 = request.form['unique_column2']
-            column_to_compare1 = request.form['columns_to_compare1']
-            column_to_compare2 = request.form['columns_to_compare2']
 
-            if file1 and file2:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(process_files, file1, file2, unique_column1, unique_column2, column_to_compare1, column_to_compare2)
-                    error, result = future.result()
-                
-                if error:
-                    return f"Error: {error}", 500
-
-                combined_df, sheet_names = result
-
-                return render_template('index.html', sheets_available=True)
-
-        except Exception as e:
-            return f"Error: {str(e)}", 500
-
-    return render_template('index.html', sheets_available=False)
-
-@app.route('/get_headers', methods=['POST'])
+@app.route("/get_headers", methods=["POST"])
 def get_headers():
+    file1 = request.files.get("file1")
+    file2 = request.files.get("file2")
+
+    headers = {"file1_headers": [], "file2_headers": []}
+
+    if file1 and allowed_file(file1.filename):
+        file1_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file1.filename))
+        file1.save(file1_path)
+        df1 = read_file(file1_path)
+        if df1 is not None:
+            headers["file1_headers"] = list(df1.columns)
+
+    if file2 and allowed_file(file2.filename):
+        file2_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file2.filename))
+        file2.save(file2_path)
+        df2 = read_file(file2_path)
+        if df2 is not None:
+            headers["file2_headers"] = list(df2.columns)
+
+    return jsonify(headers)
+
+
+@app.route("/compare", methods=["POST"])
+def compare():
     try:
-        file1 = request.files.get('file1')
-        file2 = request.files.get('file2')
+        file1 = request.files.get("file1")
+        file2 = request.files.get("file2")
 
-        if not file1 or not file2:
-            return jsonify({'error': 'Both files are required.'}), 400
+        unique_col1 = request.form.get("unique_column_file1")
+        unique_col2 = request.form.get("unique_column_file2")
+        compare_col1 = request.form.get("compare_column_file1")
+        compare_col2 = request.form.get("compare_column_file2")
 
-        headers = {}
+        if not all([file1, file2, unique_col1, unique_col2, compare_col1, compare_col2]):
+            return jsonify({"error": "All fields are required"}), 400
 
-        # Debugging output
-        print(f"Received files: {file1.filename}, {file2.filename}")
+        # Save files
+        file1_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file1.filename))
+        file2_path = os.path.join(app.config["UPLOAD_FOLDER"], secure_filename(file2.filename))
+        file1.save(file1_path)
+        file2.save(file2_path)
 
-        df1 = read_file(file1)
-        df2 = read_file(file2)
+        df1 = read_file(file1_path)
+        df2 = read_file(file2_path)
 
-        headers['file1'] = df1.columns.tolist() if not df1.empty else []
-        headers['file2'] = df2.columns.tolist() if not df2.empty else []
+        if df1 is None or df2 is None:
+            return jsonify({"error": "Could not read one of the files"}), 400
 
-        print(f"Extracted headers: {headers}")  # Debugging output
+        # Merge data on unique keys
+        merged = pd.merge(
+            df1[[unique_col1, compare_col1]],
+            df2[[unique_col2, compare_col2]],
+            left_on=unique_col1,
+            right_on=unique_col2,
+            how="outer",
+            suffixes=("_file1", "_file2")
+        )
 
-        return jsonify(headers)
+        # Categorize results
+        matched = merged[(merged[compare_col1] == merged[compare_col2]) & merged[compare_col1].notna()]
+        partially_matched = merged[(merged[compare_col1] != merged[compare_col2]) & merged[unique_col1].notna() & merged[unique_col2].notna()]
+        sheet1_unmatched = merged[merged[unique_col2].isna()]  # in File1, not in File2
+        sheet2_unmatched = merged[merged[unique_col1].isna()]  # in File2, not in File1
+
+        # Save to Excel with 4 sheets
+        output_path = os.path.join(app.config["UPLOAD_FOLDER"], "comparison_result.xlsx")
+        with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+            matched.to_excel(writer, sheet_name="Matched", index=False)
+            partially_matched.to_excel(writer, sheet_name="Partially_Matched", index=False)
+            sheet1_unmatched.to_excel(writer, sheet_name="Sheet_1_UnMatched", index=False)
+            sheet2_unmatched.to_excel(writer, sheet_name="Sheet_2_UnMatched", index=False)
+
+        return send_file(output_path, as_attachment=True)
 
     except Exception as e:
-        print(f"Error in get_headers: {str(e)}")  # Debugging output
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route('/download')
-def download():
-    try:
-        output = io.BytesIO()
-        
-        # Generate the combined Excel file with multiple sheets
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            combined_df['Matched'].to_excel(writer, sheet_name='Matched', index=False)
-            combined_df['Partially_Matched'].to_excel(writer, sheet_name='Partially_Matched', index=False)
-            combined_df['S1_UnMatched'].to_excel(writer, sheet_name='Sheet_1_UnMatched', index=False)
-            combined_df['S2_UnMatched'].to_excel(writer, sheet_name='Sheet_2_UnMatched', index=False)
-
-        output.seek(0)
-        return send_file(output, as_attachment=True, download_name='comparison_output.xlsx')
-
-    except Exception as e:
-        return f"Error: {str(e)}", 500
-     
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
-
 
 
 
