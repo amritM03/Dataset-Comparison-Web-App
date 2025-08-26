@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, send_file, jsonify
 import io
 import concurrent.futures
 
-app = Flask(_name_)
+app = Flask(__name__)
 combined_df = {}
 sheet_names = []
 
@@ -162,5 +162,5 @@ def download():
         return f"Error: {str(e)}", 500
      
 
-if _name_ == '_main_':
+if __name__ == '__main__':
     app.run(debug=True)
