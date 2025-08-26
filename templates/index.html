@@ -24,6 +24,7 @@
       border-radius: 16px;
       box-shadow: 0 8px 30px rgba(0,0,0,0.15);
       animation: fadeIn 0.5s ease-in-out;
+      position: relative;
     }
 
     h1 {
@@ -70,7 +71,7 @@
       margin-top: 20px;
     }
 
-    input[type="submit"] {
+    input[type="submit"], #downloadBtn {
       background-color: #1b3fab;
       color: #fff;
       padding: 12px 24px;
@@ -81,7 +82,7 @@
       transition: background-color 0.3s ease;
     }
 
-    input[type="submit"]:hover {
+    input[type="submit"]:hover, #downloadBtn:hover {
       background-color: #16327e;
     }
 
@@ -109,9 +110,90 @@
       from {opacity: 0; transform: translateY(20px);}
       to {opacity: 1; transform: translateY(0);}
     }
+
+    /* Spinner Styles */
+    .spinner-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255,255,255,0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 16px;
+      display: none;
+      z-index: 10;
+    }
+
+    .spinner {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #1b3fab;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg);}
+      100% { transform: rotate(360deg);}
+    }
   </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner-overlay" id="spinner">
+      <div class="spinner"></div>
+    </div>
+    <h1>File Comparator</h1>
+    <form method="post" enctype="multipart/form-data" action="/">
+      <div>
+        <label for="file1">File 1:</label>
+        <input type="file" id="file1" name="file1" accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="checkAndUpload()" required>
+      </div>
+      <div>
+        <label for="file2">File 2:</label>
+        <input type="file" id="file2" name="file2" accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="checkAndUpload()" required>
+      </div>
+      <div>
+        <label for="unique_column1">Unique Column for File 1:</label>
+        <select id="unique_column1" name="unique_column1"></select>
+      </div>
+      <div>
+        <label for="unique_column2">Unique Column for File 2:</label>
+        <select id="unique_column2" name="unique_column2"></select>
+      </div>
+      <div>
+        <label for="columns_to_compare1">Column to Compare for File 1:</label>
+        <select id="columns_to_compare1" name="columns_to_compare1"></select>
+      </div>
+      <div>
+        <label for="columns_to_compare2">Column to Compare for File 2:</label>
+        <select id="columns_to_compare2" name="columns_to_compare2"></select>
+      </div>
+      <div class="submit-container">
+        <input type="submit" value="Compare Files" onclick="showLoading()">
+      </div>
+    </form>
+
+    {% if sheets_available %}
+    <div class="download-links">
+      <button id="downloadBtn">Download Comparison Result</button>
+    </div>
+    {% endif %}
+  </div>
 
   <script>
+    const spinner = document.getElementById('spinner');
+
+    function showLoading() {
+      spinner.style.display = 'flex';
+    }
+
+    function hideLoading() {
+      spinner.style.display = 'none';
+    }
+
     function checkAndUpload() {
       const file1 = document.getElementById('file1').files[0];
       const file2 = document.getElementById('file2').files[0];
@@ -121,6 +203,7 @@
     }
 
     async function uploadFiles() {
+      showLoading();
       const file1 = document.getElementById('file1').files[0];
       const file2 = document.getElementById('file2').files[0];
 
@@ -149,6 +232,8 @@
 
       } catch (error) {
         console.error('Error:', error);
+      } finally {
+        hideLoading();
       }
     }
 
@@ -158,7 +243,6 @@
       const columnsToCompareSelect1 = document.getElementById('columns_to_compare1');
       const columnsToCompareSelect2 = document.getElementById('columns_to_compare2');
 
-      // Reset with placeholders
       uniqueColumnSelect1.innerHTML = '<option disabled selected>Select column</option>';
       uniqueColumnSelect2.innerHTML = '<option disabled selected>Select column</option>';
       columnsToCompareSelect1.innerHTML = '<option disabled selected>Select column</option>';
@@ -193,48 +277,38 @@
         columnsToCompareSelect2.appendChild(option2);
       });
     }
-  </script>
-</head>
-<body>
-  <div class="container">
-    <h1>File Comparator</h1>
-    <form method="post" enctype="multipart/form-data" action="/">
-      <div>
-        <label for="file1">File 1:</label>
-        <input type="file" id="file1" name="file1" accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="checkAndUpload()" required>
-      </div>
-      <div>
-        <label for="file2">File 2:</label>
-        <input type="file" id="file2" name="file2" accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="checkAndUpload()" required>
-      </div>
-      <div>
-        <label for="unique_column1">Unique Column for File 1:</label>
-        <select id="unique_column1" name="unique_column1"></select>
-      </div>
-      <div>
-        <label for="unique_column2">Unique Column for File 2:</label>
-        <select id="unique_column2" name="unique_column2"></select>
-      </div>
-      <div>
-        <label for="columns_to_compare1">Column to Compare for File 1:</label>
-        <select id="columns_to_compare1" name="columns_to_compare1"></select>
-      </div>
-      <div>
-        <label for="columns_to_compare2">Column to Compare for File 2:</label>
-        <select id="columns_to_compare2" name="columns_to_compare2"></select>
-      </div>
-      <div class="submit-container">
-        <input type="submit" value="Compare Files">
-      </div>
-    </form>
 
-    {% if sheets_available %}
-    <div class="download-links">
-      <a href="/download">Download Comparison Result</a>
-    </div>
-    {% endif %}
-  </div>
+    // Download functionality
+    const downloadBtn = document.getElementById('downloadBtn');
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        showLoading(); // show spinner
+
+        try {
+          const response = await fetch('/download');
+          if (!response.ok) throw new Error('Download failed');
+
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'comparison_result.xlsx'; // file name
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        } catch (err) {
+          alert('Error downloading file');
+          console.error(err);
+        } finally {
+          hideLoading(); // hide spinner when done
+        }
+      });
+    }
+  </script>
 </body>
 </html>
+
 
 
