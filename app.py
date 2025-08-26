@@ -125,7 +125,7 @@ def index():
 
     return render_template('index.html', sheets_available=False)
 
-@app.route('/get_headers', methods=['POST'])
+@app.route('/get_headers', methods=["GET","POST"])
 def get_headers():
     try:
         file1 = request.files.get('file1')
@@ -164,3 +164,4 @@ def download():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
