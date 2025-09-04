@@ -15,7 +15,6 @@
       align-items: center;
       min-height: 100vh;
     }
-
     .container {
       width: 85%;
       max-width: 800px;
@@ -26,7 +25,6 @@
       animation: fadeIn 0.5s ease-in-out;
       position: relative;
     }
-
     h1 {
       font-size: 32px;
       font-weight: 700;
@@ -34,13 +32,11 @@
       margin-bottom: 30px;
       color: rgba(0,0,0);
     }
-
     form {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
     }
-
     label {
       font-size: 15px;
       font-weight: 600;
@@ -48,9 +44,7 @@
       margin-bottom: 6px;
       display: block;
     }
-
-    input[type="file"],
-    select {
+    input[type="file"], select {
       padding: 10px;
       border: 1px solid #ccc;
       border-radius: 8px;
@@ -58,19 +52,15 @@
       font-size: 14px;
       transition: border 0.2s ease;
     }
-
-    input[type="file"]:focus,
-    select:focus {
+    input[type="file"]:focus, select:focus {
       border-color: #1b3fab;
       outline: none;
     }
-
     .submit-container {
       grid-column: span 2;
       text-align: center;
       margin-top: 20px;
     }
-
     input[type="submit"], #downloadBtn {
       background-color: #1b3fab;
       color: #fff;
@@ -81,16 +71,13 @@
       cursor: pointer;
       transition: background-color 0.3s ease;
     }
-
     input[type="submit"]:hover, #downloadBtn:hover {
       background-color: #16327e;
     }
-
     .download-links {
       margin-top: 30px;
       text-align: center;
     }
-
     .download-links a {
       display: inline-block;
       padding: 12px 24px;
@@ -101,21 +88,20 @@
       font-size: 15px;
       transition: background-color 0.3s ease;
     }
-
     .download-links a:hover {
       background-color: #218838;
     }
-
     @keyframes fadeIn {
-      from {opacity: 0; transform: translateY(20px);}
-      to {opacity: 1; transform: translateY(0);}
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-
     /* Spinner Styles */
     .spinner-overlay {
       position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       background: rgba(255,255,255,0.7);
       display: flex;
       justify-content: center;
@@ -124,7 +110,6 @@
       display: none;
       z-index: 10;
     }
-
     .spinner {
       border: 6px solid #f3f3f3;
       border-top: 6px solid #1b3fab;
@@ -133,10 +118,9 @@
       height: 50px;
       animation: spin 1s linear infinite;
     }
-
     @keyframes spin {
-      0% { transform: rotate(0deg);}
-      100% { transform: rotate(360deg);}
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
   </style>
 </head>
@@ -145,15 +129,21 @@
     <div class="spinner-overlay" id="spinner">
       <div class="spinner"></div>
     </div>
+
     <h1>File Comparator</h1>
+
     <form method="post" enctype="multipart/form-data" action="/">
       <div>
         <label for="file1">File 1:</label>
-        <input type="file" id="file1" name="file1" accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="checkAndUpload()" required>
+        <input type="file" id="file1" name="file1"
+               accept=".xlsx,.xls,.csv,.tsv,.txt"
+               onchange="checkAndUpload()" required>
       </div>
       <div>
         <label for="file2">File 2:</label>
-        <input type="file" id="file2" name="file2" accept=".xlsx,.xls,.csv,.tsv,.txt" onchange="checkAndUpload()" required>
+        <input type="file" id="file2" name="file2"
+               accept=".xlsx,.xls,.csv,.tsv,.txt"
+               onchange="checkAndUpload()" required>
       </div>
       <div>
         <label for="unique_column1">Unique Column for File 1:</label>
@@ -206,7 +196,6 @@
       showLoading();
       const file1 = document.getElementById('file1').files[0];
       const file2 = document.getElementById('file2').files[0];
-
       const formData = new FormData();
       formData.append('file1', file1);
       formData.append('file2', file2);
@@ -229,7 +218,6 @@
         }
 
         populateDropdowns(headers);
-
       } catch (error) {
         console.error('Error:', error);
       } finally {
@@ -283,8 +271,7 @@
     if (downloadBtn) {
       downloadBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        showLoading(); // show spinner
-
+        showLoading();
         try {
           const response = await fetch('/download');
           if (!response.ok) throw new Error('Download failed');
@@ -293,7 +280,7 @@
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = 'comparison_result.xlsx'; // file name
+          a.download = 'comparison_result.xlsx';
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -302,7 +289,7 @@
           alert('Error downloading file');
           console.error(err);
         } finally {
-          hideLoading(); // hide spinner when done
+          hideLoading();
         }
       });
     }
