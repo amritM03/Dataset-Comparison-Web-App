@@ -135,11 +135,30 @@ def get_headers():
             return jsonify({'error': 'Both files are required.'}), 400
 
         headers = {}
-        df1 = read_file(file1)
-        df2 = read_file(file2)
 
-        headers['file1'] = df1.columns.tolist() if not df1.empty else []
-        headers['file2'] = df2.columns.tolist() if not df2.empty else []
+        # File 1 headers
+        if file1.filename.endswith(('.xlsx', '.xls')):
+            df1 = pd.read_excel(file1, nrows=0)   # Only read headers
+        elif file1.filename.endswith('.csv'):
+            df1 = pd.read_csv(file1, nrows=0)
+        elif file1.filename.endswith(('.tsv', '.txt')):
+            df1 = pd.read_csv(file1, sep='\t', nrows=0)
+        else:
+            return jsonify({'error': f'Unsupported format for {file1.filename}'}), 400
+
+        headers['file1'] = df1.columns.tolist()
+
+        # File 2 headers
+        if file2.filename.endswith(('.xlsx', '.xls')):
+            df2 = pd.read_excel(file2, nrows=0)
+        elif file2.filename.endswith('.csv'):
+            df2 = pd.read_csv(file2, nrows=0)
+        elif file2.filename.endswith(('.tsv', '.txt')):
+            df2 = pd.read_csv(file2, sep='\t', nrows=0)
+        else:
+            return jsonify({'error': f'Unsupported format for {file2.filename}'}), 400
+
+        headers['file2'] = df2.columns.tolist()
 
         return jsonify(headers)
 
@@ -164,4 +183,5 @@ def download():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
