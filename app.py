@@ -32,7 +32,7 @@ def process_files(file1, file2, unique_column1, unique_column2, column_to_compar
         if column_to_compare1 not in df1.columns or column_to_compare2 not in df2.columns:
             return "Error: No common columns found for comparison.", None
 
-        # Convert both columns to float for comparison
+        # Convert both columns to float
         df1[column_to_compare1] = df1[column_to_compare1].astype(float)
         df2[column_to_compare2] = df2[column_to_compare2].astype(float)
 
@@ -94,6 +94,7 @@ def process_files(file1, file2, unique_column1, unique_column2, column_to_compar
     except Exception as e:
         return str(e), None
 
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     global combined_df, sheet_names
@@ -125,32 +126,34 @@ def index():
 
     return render_template('index.html', sheets_available=False)
 
-@app.route('/get_headers', methods=["GET","POST"])
+
+@app.route('/get_headers', methods=["POST"])
 def get_headers():
     try:
-        file1 = request.files.get('file1')
-        file2 = request.files.get('file2')
-
-        if not file1 or not file2:
+        if 'file1' not in request.files or 'file2' not in request.files:
             return jsonify({'error': 'Both files are required.'}), 400
 
-        headers = {}
+        file1 = request.files['file1']
+        file2 = request.files['file2']
+
         df1 = read_file(file1)
         df2 = read_file(file2)
 
-        headers['file1'] = df1.columns.tolist() if not df1.empty else []
-        headers['file2'] = df2.columns.tolist() if not df2.empty else []
+        headers = {
+            'file1': df1.columns.tolist() if not df1.empty else [],
+            'file2': df2.columns.tolist() if not df2.empty else []
+        }
 
         return jsonify(headers)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/download')
 def download():
     try:
         output = io.BytesIO()
-        
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             for sheet_name, df in combined_df.items():
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
@@ -160,8 +163,10 @@ def download():
 
     except Exception as e:
         return f"Error: {str(e)}", 500
-     
+
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+
 
