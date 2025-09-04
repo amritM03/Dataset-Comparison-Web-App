@@ -15,7 +15,6 @@
       align-items: center;
       min-height: 100vh;
     }
-
     .container {
       width: 85%;
       max-width: 800px;
@@ -26,7 +25,6 @@
       animation: fadeIn 0.5s ease-in-out;
       position: relative;
     }
-
     h1 {
       font-size: 32px;
       font-weight: 700;
@@ -34,13 +32,11 @@
       margin-bottom: 30px;
       color: rgba(0,0,0);
     }
-
     form {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
     }
-
     label {
       font-size: 15px;
       font-weight: 600;
@@ -48,7 +44,6 @@
       margin-bottom: 6px;
       display: block;
     }
-
     input[type="file"],
     select {
       padding: 10px;
@@ -56,21 +51,12 @@
       border-radius: 8px;
       width: 100%;
       font-size: 14px;
-      transition: border 0.2s ease;
     }
-
-    input[type="file"]:focus,
-    select:focus {
-      border-color: #1b3fab;
-      outline: none;
-    }
-
     .submit-container {
       grid-column: span 2;
       text-align: center;
       margin-top: 20px;
     }
-
     input[type="submit"], #downloadBtn {
       background-color: #1b3fab;
       color: #fff;
@@ -81,17 +67,14 @@
       cursor: pointer;
       transition: background-color 0.3s ease;
     }
-
     input[type="submit"]:hover, #downloadBtn:hover {
       background-color: #16327e;
     }
-
     .download-links {
       margin-top: 30px;
       text-align: center;
     }
-
-    .download-links a {
+    .download-links a, .download-links button {
       display: inline-block;
       padding: 12px 24px;
       background-color: #28a745;
@@ -101,11 +84,9 @@
       font-size: 15px;
       transition: background-color 0.3s ease;
     }
-
-    .download-links a:hover {
+    .download-links a:hover, .download-links button:hover {
       background-color: #218838;
     }
-
     @keyframes fadeIn {
       from {opacity: 0; transform: translateY(20px);}
       to {opacity: 1; transform: translateY(0);}
@@ -176,7 +157,8 @@
         });
 
         if (!response.ok) {
-          throw new Error('Error fetching headers');
+          const text = await response.text();
+          throw new Error(`Error fetching headers: ${text}`);
         }
 
         const headers = await response.json();
@@ -190,6 +172,7 @@
 
       } catch (error) {
         console.error('Error:', error);
+        alert(error.message);
       }
     }
 
