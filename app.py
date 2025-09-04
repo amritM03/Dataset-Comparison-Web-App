@@ -7,6 +7,7 @@ app = Flask(__name__)
 combined_df = {}
 sheet_names = []
 
+
 def read_file(file):
     filename = file.filename
     if filename.endswith('.xlsx') or filename.endswith('.xls'):
@@ -17,6 +18,7 @@ def read_file(file):
         return pd.read_csv(file, sep='\t', dtype=str)
     else:
         raise ValueError("Unsupported file format")
+
 
 def process_files(file1, file2, unique_column1, unique_column2, column_to_compare1, column_to_compare2):
     try:
@@ -32,7 +34,6 @@ def process_files(file1, file2, unique_column1, unique_column2, column_to_compar
         if column_to_compare1 not in df1.columns or column_to_compare2 not in df2.columns:
             return "Error: No common columns found for comparison.", None
 
-        # Convert both columns to float for comparison
         df1[column_to_compare1] = df1[column_to_compare1].astype(float)
         df2[column_to_compare2] = df2[column_to_compare2].astype(float)
 
@@ -94,6 +95,7 @@ def process_files(file1, file2, unique_column1, unique_column2, column_to_compar
     except Exception as e:
         return str(e), None
 
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     global combined_df, sheet_names
@@ -109,9 +111,10 @@ def index():
 
             if file1 and file2:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(process_files, file1, file2, unique_column1, unique_column2, column_to_compare1, column_to_compare2)
+                    future = executor.submit(process_files, file1, file2, unique_column1, unique_column2,
+                                             column_to_compare1, column_to_compare2)
                     error, result = future.result()
-                
+
                 if error:
                     return f"Error: {error}", 500
 
@@ -124,6 +127,7 @@ def index():
             return f"Error: {str(e)}", 500
 
     return render_template('index.html', sheets_available=False)
+
 
 @app.route('/get_headers', methods=['POST'])
 def get_headers():
@@ -138,14 +142,13 @@ def get_headers():
 
         # File 1 headers
         if file1.filename.endswith(('.xlsx', '.xls')):
-            df1 = pd.read_excel(file1, nrows=0)   # Only read headers
+            df1 = pd.read_excel(file1, nrows=0)
         elif file1.filename.endswith('.csv'):
             df1 = pd.read_csv(file1, nrows=0)
         elif file1.filename.endswith(('.tsv', '.txt')):
             df1 = pd.read_csv(file1, sep='\t', nrows=0)
         else:
             return jsonify({'error': f'Unsupported format for {file1.filename}'}), 400
-
         headers['file1'] = df1.columns.tolist()
 
         # File 2 headers
@@ -157,7 +160,6 @@ def get_headers():
             df2 = pd.read_csv(file2, sep='\t', nrows=0)
         else:
             return jsonify({'error': f'Unsupported format for {file2.filename}'}), 400
-
         headers['file2'] = df2.columns.tolist()
 
         return jsonify(headers)
@@ -165,11 +167,12 @@ def get_headers():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/download')
 def download():
     try:
         output = io.BytesIO()
-        
+
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             for sheet_name, df in combined_df.items():
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
@@ -179,9 +182,10 @@ def download():
 
     except Exception as e:
         return f"Error: {str(e)}", 500
-     
+
 
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
