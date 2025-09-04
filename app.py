@@ -4,27 +4,42 @@ import io
 import concurrent.futures
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB safety
+
 combined_df = {}
 sheet_names = []
 
 def read_file(file):
-    filename = file.filename
-    if filename.endswith('.xlsx') or filename.endswith('.xls'):
+    filename = (file.filename or "").lower()
+    if filename.endswith(('.xlsx', '.xls')):
         return pd.read_excel(file, dtype=str)
     elif filename.endswith('.csv'):
         return pd.read_csv(file, dtype=str)
-    elif filename.endswith('.tsv') or filename.endswith('.txt'):
+    elif filename.endswith(('.tsv', '.txt')):
         return pd.read_csv(file, sep='\t', dtype=str)
     else:
         raise ValueError("Unsupported file format")
+
+def read_headers_only(file):
+    filename = (file.filename or "").lower()
+    if filename.endswith(('.xlsx', '.xls')):
+        df = pd.read_excel(file, dtype=str, nrows=0)
+    elif filename.endswith('.csv'):
+        df = pd.read_csv(file, dtype=str, nrows=0)
+    elif filename.endswith(('.tsv', '.txt')):
+        df = pd.read_csv(file, sep='\t', dtype=str, nrows=0)
+    else:
+        raise ValueError("Unsupported file format")
+    return df.columns.tolist()
 
 def process_files(file1, file2, unique_column1, unique_column2, column_to_compare1, column_to_compare2):
     try:
         df1 = read_file(file1)
         df2 = read_file(file2)
 
-        df1[unique_column1] = df1[unique_column1].str.strip().str.lstrip('0')
-        df2[unique_column2] = df2[unique_column2].str.strip().str.lstrip('0')
+        # Normalize key columns
+        df1[unique_column1] = df1[unique_column1].astype(str).str.strip().str.lstrip('0')
+        df2[unique_column2] = df2[unique_column2].astype(str).str.strip().str.lstrip('0')
 
         df1.set_index(unique_column1, inplace=True)
         df2.set_index(unique_column2, inplace=True)
@@ -32,9 +47,13 @@ def process_files(file1, file2, unique_column1, unique_column2, column_to_compar
         if column_to_compare1 not in df1.columns or column_to_compare2 not in df2.columns:
             return "Error: No common columns found for comparison.", None
 
-        # Convert both columns to float
-        df1[column_to_compare1] = df1[column_to_compare1].astype(float)
-        df2[column_to_compare2] = df2[column_to_compare2].astype(float)
+        # Robust numeric conversion (won't crash on non-numeric)
+        df1[column_to_compare1] = pd.to_numeric(
+            df1[column_to_compare1].astype(str).str.replace(',', ''), errors='coerce'
+        )
+        df2[column_to_compare2] = pd.to_numeric(
+            df2[column_to_compare2].astype(str).str.replace(',', ''), errors='coerce'
+        )
 
         common_index = df1.index.intersection(df2.index)
         unique_index_df1 = df1.index.difference(df2.index)
@@ -52,6 +71,7 @@ def process_files(file1, file2, unique_column1, unique_column2, column_to_compar
         totallyunmatched_1 = pd.DataFrame(unmatched_df1)
         totallyunmatched_2 = pd.DataFrame(unmatched_df2)
 
+        # Bring key columns back as columns (not index)
         if not differing_.empty:
             differing_[unique_column1] = differing_.index
         if not identical_.empty:
@@ -63,13 +83,10 @@ def process_files(file1, file2, unique_column1, unique_column2, column_to_compar
 
         def move_columns_to_end(df, unique_col, compare_col):
             cols = df.columns.tolist()
-            if unique_col in cols:
-                cols.remove(unique_col)
-            if compare_col in cols:
-                cols.remove(compare_col)
+            if unique_col in cols: cols.remove(unique_col)
+            if compare_col in cols: cols.remove(compare_col)
             cols.append(unique_col)
-            if compare_col in df.columns:
-                cols.append(compare_col)
+            if compare_col in df.columns: cols.append(compare_col)
             return df[cols]
 
         if not differing_.empty:
@@ -81,19 +98,18 @@ def process_files(file1, file2, unique_column1, unique_column2, column_to_compar
         if not totallyunmatched_2.empty:
             totallyunmatched_2 = move_columns_to_end(totallyunmatched_2, unique_column2, column_to_compare2)
 
-        combined_df = {
+        combined = {
             'Matched': identical_,
             'Partially_Matched': differing_,
             'Sheet_1_UnMatched': totallyunmatched_1,
             'Sheet_2_UnMatched': totallyunmatched_2
         }
-        sheet_names = ['Matched', 'Partially_Matched', 'Sheet_1_UnMatched', 'Sheet_2_UnMatched']
+        sheets = ['Matched', 'Partially_Matched', 'Sheet_1_UnMatched', 'Sheet_2_UnMatched']
 
-        return None, (combined_df, sheet_names)
+        return None, (combined, sheets)
 
     except Exception as e:
         return str(e), None
-
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -110,22 +126,22 @@ def index():
 
             if file1 and file2:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(process_files, file1, file2, unique_column1, unique_column2, column_to_compare1, column_to_compare2)
+                    future = executor.submit(
+                        process_files, file1, file2,
+                        unique_column1, unique_column2,
+                        column_to_compare1, column_to_compare2
+                    )
                     error, result = future.result()
-                
+
                 if error:
                     return f"Error: {error}", 500
 
-                global combined_df, sheet_names
                 combined_df, sheet_names = result
-
-                return render_template('index.html', sheets_available=True)
-
+                return render_template('index.html')  # JS reveals download button
         except Exception as e:
             return f"Error: {str(e)}", 500
 
-    return render_template('index.html', sheets_available=False)
-
+    return render_template('index.html')
 
 @app.route('/get_headers', methods=["POST"])
 def get_headers():
@@ -136,19 +152,13 @@ def get_headers():
         file1 = request.files['file1']
         file2 = request.files['file2']
 
-        df1 = read_file(file1)
-        df2 = read_file(file2)
-
         headers = {
-            'file1': df1.columns.tolist() if not df1.empty else [],
-            'file2': df2.columns.tolist() if not df2.empty else []
+            'file1': read_headers_only(file1),
+            'file2': read_headers_only(file2),
         }
-
         return jsonify(headers)
-
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/download')
 def download():
@@ -160,10 +170,8 @@ def download():
 
         output.seek(0)
         return send_file(output, as_attachment=True, download_name='comparison_output.xlsx')
-
     except Exception as e:
         return f"Error: {str(e)}", 500
-
 
 if __name__ == '__main__':
     app.run(debug=True)
