@@ -1,18 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Dataset Comparison Tool</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #1e3c72;
       background: linear-gradient(to right, #2a5298, #1e3c72);
       color: #fff;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
       margin: 0;
     }
     .container {
@@ -20,8 +19,9 @@
       color: #333;
       padding: 30px;
       border-radius: 12px;
-      box-shadow: 0px 4px 15px rgba(0,0,0,0.2);
-      width: 800px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      width: 1000px;          
+      max-width: 96vw;        
     }
     h2 {
       text-align: center;
@@ -32,20 +32,15 @@
       grid-template-columns: 1fr 1fr;
       gap: 20px;
     }
-    .form-group {
-      margin-bottom: 15px;
-    }
-    label {
-      font-weight: bold;
-      display: block;
-      margin-bottom: 5px;
-    }
+    .form-group { margin-bottom: 15px; }
+    label { font-weight: bold; display: block; margin-bottom: 5px; }
     input, select {
       width: 100%;
-      padding: 8px;
+      padding: 10px;
       border-radius: 6px;
       border: 1px solid #ccc;
       font-size: 14px;
+      box-sizing: border-box;
     }
     .buttons {
       display: flex;
@@ -64,17 +59,13 @@
       background: #1e3c72;
       color: #fff;
     }
-    #compareBtn:hover {
-      background: #2a5298;
-    }
+    #compareBtn:hover { background: #2a5298; }
     #downloadBtn {
       background: green;
       color: #fff;
       display: none;
     }
-    #downloadBtn:hover {
-      background: darkgreen;
-    }
+    #downloadBtn:hover { background: darkgreen; }
   </style>
 </head>
 <body>
@@ -82,11 +73,10 @@
     <h2>Dataset Comparison Tool</h2>
     <form id="compareForm" method="post" enctype="multipart/form-data">
       <div class="form-grid">
-        <!-- Left Side -->
         <div>
           <div class="form-group">
             <label for="file1">File 1:</label>
-            <input type="file" id="file1" name="file1" required>
+            <input type="file" id="file1" name="file1" accept=".xlsx,.xls,.csv,.tsv,.txt" required />
           </div>
           <div class="form-group">
             <label for="unique_column1">Unique Column (File 1):</label>
@@ -97,98 +87,9 @@
             <select id="columns_to_compare1" name="columns_to_compare1"></select>
           </div>
         </div>
-
-        <!-- Right Side -->
         <div>
           <div class="form-group">
-            <label for="file2">File 2:</label>
-            <input type="file" id="file2" name="file2" required>
-          </div>
-          <div class="form-group">
-            <label for="unique_column2">Unique Column (File 2):</label>
-            <select id="unique_column2" name="unique_column2"></select>
-          </div>
-          <div class="form-group">
-            <label for="columns_to_compare2">Column to Compare (File 2):</label>
-            <select id="columns_to_compare2" name="columns_to_compare2"></select>
-          </div>
-        </div>
-      </div>
-
-      <!-- Buttons in middle -->
-      <div class="buttons">
-        <button type="submit" id="compareBtn">Compare</button>
-        <button type="button" id="downloadBtn" onclick="window.location.href='/download'">Download Results</button>
-      </div>
-    </form>
-  </div>
-
-  <script>
-    document.getElementById("file1").addEventListener("change", fetchHeaders);
-    document.getElementById("file2").addEventListener("change", fetchHeaders);
-
-    function fetchHeaders() {
-      let file1 = document.getElementById("file1").files[0];
-      let file2 = document.getElementById("file2").files[0];
-      if (!file1 || !file2) return;
-
-      let formData = new FormData();
-      formData.append("file1", file1);
-      formData.append("file2", file2);
-
-      fetch("/get_headers", {
-        method: "POST",
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.error) {
-          alert("Error: " + data.error);
-        } else {
-          populateDropdown("unique_column1", data.file1);
-          populateDropdown("columns_to_compare1", data.file1);
-          populateDropdown("unique_column2", data.file2);
-          populateDropdown("columns_to_compare2", data.file2);
-        }
-      })
-      .catch(err => {
-        alert("Fetch error: " + err);
-      });
-    }
-
-    function populateDropdown(id, options) {
-      let dropdown = document.getElementById(id);
-      dropdown.innerHTML = "";
-      options.forEach(opt => {
-        let option = document.createElement("option");
-        option.value = opt;
-        option.textContent = opt;
-        dropdown.appendChild(option);
-      });
-    }
-
-    document.getElementById("compareForm").addEventListener("submit", function(e) {
-      e.preventDefault();
-      let formData = new FormData(this);
-
-      fetch("/", {
-        method: "POST",
-        body: formData
-      })
-      .then(res => {
-        if (!res.ok) throw new Error("Server error during comparison");
-        return res.text();
-      })
-      .then(html => {
-        document.getElementById("downloadBtn").style.display = "inline-block";
-        alert("Comparison done! Click 'Download Results' to get the Excel file.");
-      })
-      .catch(err => alert("Error: " + err));
-    });
-  </script>
-</body>
-</html>
-
+            <label for="file2">File
 
 
 
