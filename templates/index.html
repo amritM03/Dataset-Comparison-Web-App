@@ -110,41 +110,10 @@
       from {opacity: 0; transform: translateY(20px);}
       to {opacity: 1; transform: translateY(0);}
     }
-
-    /* Spinner Styles */
-    .spinner-overlay {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(255,255,255,0.7);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      border-radius: 16px;
-      display: none;
-      z-index: 10;
-    }
-
-    .spinner {
-      border: 6px solid #f3f3f3;
-      border-top: 6px solid #1b3fab;
-      border-radius: 50%;
-      width: 50px;
-      height: 50px;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg);}
-      100% { transform: rotate(360deg);}
-    }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="spinner-overlay" id="spinner">
-      <div class="spinner"></div>
-    </div>
     <h1>File Comparator</h1>
     <form method="post" enctype="multipart/form-data" action="/">
       <div>
@@ -172,7 +141,7 @@
         <select id="columns_to_compare2" name="columns_to_compare2"></select>
       </div>
       <div class="submit-container">
-        <input type="submit" value="Compare Files" onclick="showLoading()">
+        <input type="submit" value="Compare Files">
       </div>
     </form>
 
@@ -184,16 +153,6 @@
   </div>
 
   <script>
-    const spinner = document.getElementById('spinner');
-
-    function showLoading() {
-      spinner.style.display = 'flex';
-    }
-
-    function hideLoading() {
-      spinner.style.display = 'none';
-    }
-
     function checkAndUpload() {
       const file1 = document.getElementById('file1').files[0];
       const file2 = document.getElementById('file2').files[0];
@@ -203,7 +162,6 @@
     }
 
     async function uploadFiles() {
-      showLoading();
       const file1 = document.getElementById('file1').files[0];
       const file2 = document.getElementById('file2').files[0];
 
@@ -232,8 +190,6 @@
 
       } catch (error) {
         console.error('Error:', error);
-      } finally {
-        hideLoading();
       }
     }
 
@@ -283,7 +239,6 @@
     if (downloadBtn) {
       downloadBtn.addEventListener('click', async (e) => {
         e.preventDefault();
-        showLoading(); // show spinner
 
         try {
           const response = await fetch('/download');
@@ -293,7 +248,7 @@
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = 'comparison_result.xlsx'; // file name
+          a.download = 'comparison_result.xlsx';
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -301,8 +256,6 @@
         } catch (err) {
           alert('Error downloading file');
           console.error(err);
-        } finally {
-          hideLoading(); // hide spinner when done
         }
       });
     }
