@@ -20,7 +20,7 @@
       padding: 30px;
       border-radius: 12px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-      width: 1000px;          
+      width: 1000px;         /
       max-width: 96vw;        
     }
     h2 {
@@ -87,9 +87,124 @@
             <select id="columns_to_compare1" name="columns_to_compare1"></select>
           </div>
         </div>
+
         <div>
           <div class="form-group">
-            <label for="file2">File
+            <label for="file2">File 2:</label>
+            <input type="file" id="file2" name="file2" accept=".xlsx,.xls,.csv,.tsv,.txt" required />
+          </div>
+          <div class="form-group">
+            <label for="unique_column2">Unique Column (File 2):</label>
+            <select id="unique_column2" name="unique_column2"></select>
+          </div>
+          <div class="form-group">
+            <label for="columns_to_compare2">Column to Compare (File 2):</label>
+            <select id="columns_to_compare2" name="columns_to_compare2"></select>
+          </div>
+        </div>
+      </div>
 
+      <!-- Buttons centered -->
+      <div class="buttons">
+        <button type="submit" id="compareBtn">Compare</button>
+        <button type="button" id="downloadBtn">Download Results</button>
+      </div>
+    </form>
+  </div>
 
+  <script>
+    const MAX_MB = 25;
+    function tooBig(f) { return f && f.size > MAX_MB * 1024 * 1024; }
 
+    document.getElementById("file1").addEventListener("change", fetchHeaders);
+    document.getElementById("file2").addEventListener("change", fetchHeaders);
+
+    async function fetchHeaders() {
+      const file1 = document.getElementById("file1").files[0];
+      const file2 = document.getElementById("file2").files[0];
+      if (!file1 || !file2) return;
+
+      if (tooBig(file1) || tooBig(file2)) {
+        alert(`Each file must be <= ${MAX_MB} MB.`);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file1", file1);
+      formData.append("file2", file2);
+
+      try {
+        const res = await fetch("/get_headers", { method: "POST", body: formData });
+        const ct = res.headers.get("content-type") || "";
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        if (!ct.includes("application/json")) {
+          const text = await res.text();
+          throw new Error(`Expected JSON, got: ${text.slice(0, 200)}`);
+        }
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        populateDropdown("unique_column1", data.file1);
+        populateDropdown("columns_to_compare1", data.file1);
+        populateDropdown("unique_column2", data.file2);
+        populateDropdown("columns_to_compare2", data.file2);
+      } catch (err) {
+        alert(`Fetch error: ${err.message}`);
+        console.error(err);
+      }
+    }
+
+    function populateDropdown(id, options) {
+      const el = document.getElementById(id);
+      el.innerHTML = "";
+      options.forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        el.appendChild(o);
+      });
+    }
+
+    document.getElementById("compareForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+
+      try {
+        const res = await fetch("/", { method: "POST", body: formData });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        // Show download button on success
+        document.getElementById("downloadBtn").style.display = "inline-block";
+        alert("Comparison complete. Click 'Download Results' to get the Excel file.");
+      } catch (err) {
+        alert(`Error: ${err.message}`);
+        console.error(err);
+      }
+    });
+
+    document.getElementById("downloadBtn").addEventListener("click", async () => {
+      try {
+        const res = await fetch("/download");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "comparison_result.xlsx";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert(`Download failed: ${err.message}`);
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>
