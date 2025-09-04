@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dataset Comparison Tool</title>
+  <title>File Comparator</title>
   <style>
     body {
       font-family: "Inter", "Roboto", sans-serif;
@@ -17,12 +17,14 @@
     }
 
     .container {
-      width: 90%;
-      max-width: 950px;
+      width: 85%;
+      max-width: 800px;
       background: #fff;
       padding: 40px;
       border-radius: 16px;
       box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+      animation: fadeIn 0.5s ease-in-out;
+      position: relative;
     }
 
     h1 {
@@ -30,13 +32,13 @@
       font-weight: 700;
       text-align: center;
       margin-bottom: 30px;
-      color: #222;
+      color: rgba(0,0,0);
     }
 
-    .form-grid {
+    form {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 25px;
+      gap: 20px;
     }
 
     label {
@@ -49,7 +51,7 @@
 
     input[type="file"],
     select {
-      padding: 12px;
+      padding: 10px;
       border: 1px solid #ccc;
       border-radius: 8px;
       width: 100%;
@@ -63,146 +65,165 @@
       outline: none;
     }
 
-    .buttons {
+    .submit-container {
       grid-column: span 2;
       text-align: center;
-      margin-top: 25px;
+      margin-top: 20px;
     }
 
-    button {
+    input[type="submit"], #downloadBtn {
       background-color: #1b3fab;
       color: #fff;
-      padding: 12px 26px;
+      padding: 12px 24px;
       font-size: 16px;
       border: none;
       border-radius: 8px;
       cursor: pointer;
       transition: background-color 0.3s ease;
-      margin: 0 10px;
     }
 
-    button:hover {
+    input[type="submit"]:hover, #downloadBtn:hover {
       background-color: #16327e;
+    }
+
+    .download-links {
+      margin-top: 30px;
+      text-align: center;
     }
 
     #downloadBtn {
       background-color: #28a745;
-      display: none;
+      display: none; /* hidden until comparison done */
     }
 
     #downloadBtn:hover {
       background-color: #218838;
     }
+
+    @keyframes fadeIn {
+      from {opacity: 0; transform: translateY(20px);}
+      to {opacity: 1; transform: translateY(0);}
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Dataset Comparison Tool</h1>
-
-    <form id="compareForm" method="post" enctype="multipart/form-data">
-      <div class="form-grid">
-        <!-- Left Side -->
-        <div>
-          <label for="file1">File 1:</label>
-          <input type="file" id="file1" name="file1" accept=".xlsx,.xls,.csv,.tsv,.txt" required>
-
-          <label for="unique_column1">Unique Column (File 1):</label>
-          <select id="unique_column1" name="unique_column1" required></select>
-
-          <label for="columns_to_compare1">Column to Compare (File 1):</label>
-          <select id="columns_to_compare1" name="columns_to_compare1" required></select>
-        </div>
-
-        <!-- Right Side -->
-        <div>
-          <label for="file2">File 2:</label>
-          <input type="file" id="file2" name="file2" accept=".xlsx,.xls,.csv,.tsv,.txt" required>
-
-          <label for="unique_column2">Unique Column (File 2):</label>
-          <select id="unique_column2" name="unique_column2" required></select>
-
-          <label for="columns_to_compare2">Column to Compare (File 2):</label>
-          <select id="columns_to_compare2" name="columns_to_compare2" required></select>
-        </div>
+    <h1>File Comparator</h1>
+    <form id="compareForm" method="post" enctype="multipart/form-data" action="/">
+      <div>
+        <label for="file1">File 1:</label>
+        <input type="file" id="file1" name="file1" accept=".xlsx,.xls,.csv,.tsv,.txt" required>
       </div>
-
-      <!-- Buttons -->
-      <div class="buttons">
-        <button type="submit" id="compareBtn">Compare</button>
-        <button type="button" id="downloadBtn">Download Results</button>
+      <div>
+        <label for="file2">File 2:</label>
+        <input type="file" id="file2" name="file2" accept=".xlsx,.xls,.csv,.tsv,.txt" required>
+      </div>
+      <div>
+        <label for="unique_column1">Unique Column for File 1:</label>
+        <select id="unique_column1" name="unique_column1" required></select>
+      </div>
+      <div>
+        <label for="unique_column2">Unique Column for File 2:</label>
+        <select id="unique_column2" name="unique_column2" required></select>
+      </div>
+      <div>
+        <label for="columns_to_compare1">Column to Compare for File 1:</label>
+        <select id="columns_to_compare1" name="columns_to_compare1" required></select>
+      </div>
+      <div>
+        <label for="columns_to_compare2">Column to Compare for File 2:</label>
+        <select id="columns_to_compare2" name="columns_to_compare2" required></select>
+      </div>
+      <div class="submit-container">
+        <input type="submit" value="Compare Files">
       </div>
     </form>
+
+    <div class="download-links">
+      <button id="downloadBtn">Download Comparison Result</button>
+    </div>
   </div>
 
   <script>
     const form = document.getElementById("compareForm");
     const downloadBtn = document.getElementById("downloadBtn");
 
-    // Populate dropdowns
-    function populateDropdown(selectId, options) {
-      const select = document.getElementById(selectId);
-      select.innerHTML = "";
-      options.forEach(opt => {
-        const option = document.createElement("option");
-        option.value = opt;
-        option.textContent = opt;
-        select.appendChild(option);
-      });
-    }
-
-    // Fetch headers when files are uploaded
+    // --- Fetch headers when both files selected ---
     document.getElementById("file1").addEventListener("change", fetchHeaders);
     document.getElementById("file2").addEventListener("change", fetchHeaders);
 
-    function fetchHeaders() {
+    async function fetchHeaders() {
       const file1 = document.getElementById("file1").files[0];
       const file2 = document.getElementById("file2").files[0];
-
       if (!file1 || !file2) return;
 
       const formData = new FormData();
       formData.append("file1", file1);
       formData.append("file2", file2);
 
-      fetch("/get_headers", { method: "POST", body: formData })
-        .then(res => res.json())
-        .then(data => {
-          if (data.error) {
-            alert("Error: " + data.error);
-          } else {
-            populateDropdown("unique_column1", data.file1);
-            populateDropdown("columns_to_compare1", data.file1);
-            populateDropdown("unique_column2", data.file2);
-            populateDropdown("columns_to_compare2", data.file2);
-          }
-        })
-        .catch(err => alert("Fetch error: " + err));
+      try {
+        const response = await fetch("/get_headers", { method: "POST", body: formData });
+        if (!response.ok) throw new Error("Error fetching headers");
+
+        const headers = await response.json();
+        if (headers.error) {
+          alert(headers.error);
+          return;
+        }
+        populateDropdowns(headers);
+      } catch (err) {
+        console.error("Error:", err);
+      }
     }
 
-    // Handle form submission
-    form.addEventListener("submit", function(e) {
+    function populateDropdowns(headers) {
+      const uniqueColumnSelect1 = document.getElementById("unique_column1");
+      const uniqueColumnSelect2 = document.getElementById("unique_column2");
+      const columnsToCompareSelect1 = document.getElementById("columns_to_compare1");
+      const columnsToCompareSelect2 = document.getElementById("columns_to_compare2");
+
+      // reset
+      uniqueColumnSelect1.innerHTML = "";
+      uniqueColumnSelect2.innerHTML = "";
+      columnsToCompareSelect1.innerHTML = "";
+      columnsToCompareSelect2.innerHTML = "";
+
+      headers.file1.forEach(h => {
+        uniqueColumnSelect1.add(new Option(h, h));
+        columnsToCompareSelect1.add(new Option(h, h));
+      });
+
+      headers.file2.forEach(h => {
+        uniqueColumnSelect2.add(new Option(h, h));
+        columnsToCompareSelect2.add(new Option(h, h));
+      });
+    }
+
+    // --- Handle comparison submit ---
+    form.addEventListener("submit", async function (e) {
       e.preventDefault();
       const formData = new FormData(form);
 
-      fetch("/", { method: "POST", body: formData })
-        .then(res => {
-          if (!res.ok) throw new Error("Comparison failed");
-          return res.text();
-        })
-        .then(() => {
-          alert("Comparison complete!");
-          downloadBtn.style.display = "inline-block";
-        })
-        .catch(err => alert(err));
+      try {
+        const res = await fetch("/", { method: "POST", body: formData });
+        if (!res.ok) throw new Error("Comparison failed");
+
+        // success → show download button
+        downloadBtn.style.display = "inline-block";
+        alert("Comparison complete! Click Download to save results.");
+      } catch (err) {
+        alert(err);
+      }
     });
 
-    // Download results
-    downloadBtn.addEventListener("click", function() {
+    // --- Download results ---
+    downloadBtn.addEventListener("click", async function () {
       window.location.href = "/download";
     });
   </script>
 </body>
 </html>
+
 
 
 
